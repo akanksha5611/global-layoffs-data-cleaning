@@ -143,24 +143,6 @@ WHERE company = 'Casper';
 -- );
 
 
-/* ============================================================
-   ALTERNATE VALIDATION METHOD (OPTIONAL)
-   ------------------------------------------------------------
-   GROUP BY + HAVING COUNT(*) > 1
-   Useful for understanding duplicates but not ideal for
-   deletion when NULL values are involved.
-   ============================================================ */
-
--- SELECT company, location, industry, total_laid_off,
---        percentage_laid_off, `date`, stage,
---        country, funds_raised_millions,
---        COUNT(*) AS cnt
--- FROM layoffs_staging
--- GROUP BY company, location, industry, total_laid_off,
---          percentage_laid_off, `date`, stage,
---          country, funds_raised_millions
--- HAVING COUNT(*) > 1;
-
 
 
 
