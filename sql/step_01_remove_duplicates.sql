@@ -1,48 +1,44 @@
 /* ============================================================
-   DATA CLEANING PROCESS
+   STEP 01: CREATE STAGING TABLE & REMOVE DUPLICATES
    ------------------------------------------------------------
-   This script performs data cleaning on the layoffs dataset
-   using a staging table. The raw data remains unchanged.
+   This step creates a staging table to safely perform data
+   cleaning and removes duplicate records using ROW_NUMBER().
+   Raw data remains unchanged.
    ============================================================ */
 
--- 1. Remove duplicate records
---    Identify and delete exact duplicates using ROW_NUMBER()
 
--- 2. Standardize data
---    Clean and normalize text fields (company, industry, country, stage)
-
--- 3. Handle NULL and blank values
---    Convert blanks to NULLs and standardize missing categorical values
-
--- 4. Remove unnecessary columns (if required)
---    Drop columns that are not needed for analysis
-
-SELECT * FROM layoffs;
-
--- Create a staging table to perform data cleaning.
--- Raw data remains unchanged to preserve data integrity.
+/* ============================================================
+   1. CREATE STAGING TABLE
+   ------------------------------------------------------------
+   We work on a staging table to avoid modifying raw data.
+   ============================================================ */
 
 CREATE TABLE layoffs_staging LIKE layoffs_raw;
 
 INSERT INTO layoffs_staging
 SELECT * FROM layoffs_raw;
 
-SELECT * FROM layoffs_staging;
 
 /* ============================================================
-   STEP 1: IDENTIFY DUPLICATES 
+   2. IDENTIFY DUPLICATES (PREVIEW)
    ------------------------------------------------------------
-   Use ROW_NUMBER() to identify duplicate records.
-   Rows with row_num > 1 are duplicates.
+   Rows with row_num > 1 are duplicate records.
+   This query is for verification before deletion.
    ============================================================ */
 
 SELECT *
 FROM (
     SELECT *,
            ROW_NUMBER() OVER (
-               PARTITION BY company, location, industry, total_laid_off,
-                            percentage_laid_off, `date`, stage,
-                            country, funds_raised_millions
+               PARTITION BY company,
+                            location,
+                            industry,
+                            total_laid_off,
+                            percentage_laid_off,
+                            `date`,
+                            stage,
+                            country,
+                            funds_raised_millions
            ) AS row_num
     FROM layoffs_staging
 ) t
@@ -50,53 +46,70 @@ WHERE row_num > 1;
 
 
 /* ============================================================
-   STEP 2: DELETE DUPLICATES (PRIMARY METHOD – NULL SAFE)
+   3. DELETE DUPLICATES (PRIMARY METHOD – NULL SAFE)
    ------------------------------------------------------------
-   This DELETE uses a JOIN with NULL-safe equality (<=>)
-   to correctly remove duplicates even when NULL values exist.
-   This is the recommended and production-safe approach.
+   Uses JOIN with NULL-safe equality (<=>) to correctly remove
+   duplicates even when NULL values exist.
    ============================================================ */
 
 DELETE ls
 FROM layoffs_staging ls
 JOIN (
-    SELECT company, location, industry, total_laid_off,
-           percentage_laid_off, `date`, stage,
-           country, funds_raised_millions
+    SELECT company,
+           location,
+           industry,
+           total_laid_off,
+           percentage_laid_off,
+           `date`,
+           stage,
+           country,
+           funds_raised_millions
     FROM (
         SELECT *,
                ROW_NUMBER() OVER (
-                   PARTITION BY company, location, industry, total_laid_off,
-                                percentage_laid_off, `date`, stage,
-                                country, funds_raised_millions
+                   PARTITION BY company,
+                                location,
+                                industry,
+                                total_laid_off,
+                                percentage_laid_off,
+                                `date`,
+                                stage,
+                                country,
+                                funds_raised_millions
                ) AS row_num
         FROM layoffs_staging
     ) t
     WHERE row_num > 1
 ) d
-ON ls.company <=> d.company
-AND ls.location <=> d.location
-AND ls.industry <=> d.industry
-AND ls.total_laid_off <=> d.total_laid_off
-AND ls.percentage_laid_off <=> d.percentage_laid_off
-AND ls.`date` <=> d.`date`
-AND ls.stage <=> d.stage
-AND ls.country <=> d.country
+ON  ls.company               <=> d.company
+AND ls.location              <=> d.location
+AND ls.industry              <=> d.industry
+AND ls.total_laid_off        <=> d.total_laid_off
+AND ls.percentage_laid_off   <=> d.percentage_laid_off
+AND ls.`date`                <=> d.`date`
+AND ls.stage                 <=> d.stage
+AND ls.country               <=> d.country
 AND ls.funds_raised_millions <=> d.funds_raised_millions;
 
 
 /* ============================================================
-   STEP 3: VERIFY DUPLICATES ARE REMOVED
+   4. VERIFY DUPLICATES ARE REMOVED
    ------------------------------------------------------------
-   After deletion, this query should return ZERO rows.
+   This query should return ZERO rows.
    ============================================================ */
 
 SELECT COUNT(*) AS duplicate_count
 FROM (
     SELECT ROW_NUMBER() OVER (
-        PARTITION BY company, location, industry, total_laid_off,
-                     percentage_laid_off, `date`, stage,
-                     country, funds_raised_millions
+        PARTITION BY company,
+                     location,
+                     industry,
+                     total_laid_off,
+                     percentage_laid_off,
+                     `date`,
+                     stage,
+                     country,
+                     funds_raised_millions
     ) AS row_num
     FROM layoffs_staging
 ) t
@@ -104,9 +117,9 @@ WHERE row_num > 1;
 
 
 /* ============================================================
-   STEP 4: SANITY CHECK FOR A KNOWN CASE (OPTIONAL)
+   5. OPTIONAL SANITY CHECK (MANUAL VERIFICATION)
    ------------------------------------------------------------
-   Used to manually verify a specific record.
+   Used to manually verify a known edge case.
    ============================================================ */
 
 SELECT *
@@ -115,11 +128,11 @@ WHERE company = 'Casper';
 
 
 /* ============================================================
-   ALTERNATE METHOD (NOT USED – FOR REFERENCE ONLY)
+   ALTERNATE METHOD (REFERENCE ONLY – NOT EXECUTED)
    ------------------------------------------------------------
-   This approach uses DELETE ... IN (...) with ROW_NUMBER().
-   It DOES NOT handle NULL values correctly and may miss
-   duplicate rows. Kept here only for learning/reference.
+   DELETE ... IN (...) approach.
+   This method is NOT NULL-safe and may miss duplicates.
+   Kept for learning/reference purposes only.
    ============================================================ */
 
 -- DELETE FROM layoffs_staging
@@ -132,26 +145,17 @@ WHERE company = 'Casper';
 --     FROM (
 --         SELECT *,
 --                ROW_NUMBER() OVER (
---                    PARTITION BY company, location, industry,
---                                 total_laid_off, percentage_laid_off,
---                                 `date`, stage, country,
+--                    PARTITION BY company,
+--                                 location,
+--                                 industry,
+--                                 total_laid_off,
+--                                 percentage_laid_off,
+--                                 `date`,
+--                                 stage,
+--                                 country,
 --                                 funds_raised_millions
 --                ) AS row_num
 --         FROM layoffs_staging
 --     ) rt
 --     WHERE row_num > 1
 -- );
-
-
-
-
-
-
-
-
-
-
-
-
-
-
